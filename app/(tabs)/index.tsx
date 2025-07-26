@@ -1,75 +1,117 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { FlashList } from "@shopify/flash-list";
+import React, { useEffect } from "react";
+import {
+  ActivityIndicator,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useCoinStore } from "../../store/coinStore";
+import CryptoCard from "../components/CryptoCard";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function Home() {
+  const { coins, loading, loadingMore, error, hasMore, fetchCoins, fetchMoreCoins } = useCoinStore();
 
-export default function HomeScreen() {
+  useEffect(() => {
+    fetchCoins();
+  }, [fetchCoins]);
+
+  const renderItem = ({ item }: { item: (typeof coins)[0] }) => (
+    <CryptoCard crypto={item} />
+  );
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#007AFF" />
+        <Text style={styles.loadingMoreText}>Loading more...</Text>
+      </View>
+    );
+  };
+
+  const handleEndReached = () => {
+    if (hasMore && !loadingMore) {
+      fetchMoreCoins();
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView edges={["top"]} style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading coins...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && coins.length === 0) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <Text style={styles.errorText}>Error: {error}</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+
+      <FlashList
+        data={coins}
+        renderItem={renderItem}
+        estimatedItemSize={80}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContainer}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#F8F9FA",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#666",
+  },
+  errorText: {
+    fontSize: 16,
+    color: "#FF3B30",
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  listContainer: {
+    padding: 16,
+  },
+  footerLoader: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#666",
   },
 });
+
+
