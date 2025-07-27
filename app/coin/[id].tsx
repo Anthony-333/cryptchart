@@ -26,6 +26,13 @@ const getMinMaxValues = (data: GraphPoint[]) => {
   if (data.length === 0)
     return { min: { x: 0, value: 0 }, max: { x: 0, value: 0 } };
 
+  if (data.length === 1) {
+    return {
+      min: { x: 0, value: data[0].value },
+      max: { x: width - 32, value: data[0].value }
+    };
+  }
+
   let minValue = data[0].value;
   let maxValue = data[0].value;
   let minIndex = 0;
@@ -108,23 +115,31 @@ export default function CoinDetails() {
       setChartData(formattedData);
     } catch (error) {
       console.error("Failed to load chart data:", error);
-      // Fallback to dummy data
-      setChartData([
-        { value: 94273.18, date: new Date("2024-01-01") },
-        { value: 96500, date: new Date("2024-01-02") },
-        { value: 95200, date: new Date("2024-01-03") },
-        { value: 97800, date: new Date("2024-01-04") },
-        { value: 98509.75, date: new Date("2024-01-05") },
-      ]);
+      setChartData([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Add this function to calculate price change
+  const getPriceChange = () => {
+    if (chartData.length < 2) return { amount: 0, percentage: 0 };
+    
+    const currentPrice = chartData[chartData.length - 1]?.value || 0;
+    const previousPrice = chartData[0]?.value || 0;
+    
+    const changeAmount = currentPrice - previousPrice;
+    const changePercentage = previousPrice !== 0 ? (changeAmount / previousPrice) * 100 : 0;
+    
+    return { amount: changeAmount, percentage: changePercentage };
   };
 
   const currentPrice = selectedPoint
     ? selectedPoint.value
     : chartData[chartData.length - 1]?.value || 98509.75;
   const currentDate = selectedPoint ? selectedPoint.date : new Date();
+  const { amount: changeAmount, percentage: changePercentage } = getPriceChange();
+  const isPositive = changeAmount >= 0;
 
   const updatePriceTitle = (point: GraphPoint) => {
     setSelectedPoint(point);
@@ -169,11 +184,15 @@ export default function CoinDetails() {
       {/* Price Section */}
       <View style={styles.priceSection}>
         <Text style={styles.currentPrice}>
-          ₹{currentPrice.toLocaleString()}
+          ${currentPrice.toLocaleString()}
         </Text>
         <View style={styles.priceChange}>
-          <Text style={styles.changeAmount}>+1700.254 (3.77%)</Text>
-          <Text style={styles.usdPrice}>$96,679.35</Text>
+          <Text style={[styles.changeAmount, { color: isPositive ? "#00C851" : "#FF3B30" }]}>
+            {isPositive ? "+" : ""}{changeAmount.toFixed(2)} ({isPositive ? "+" : ""}{changePercentage.toFixed(2)}%)
+          </Text>
+          <Text style={styles.usdPrice}>
+            {selectedTimeframe}
+          </Text>
         </View>
         {selectedPoint && (
           <Text style={styles.selectedDate}>
@@ -193,6 +212,17 @@ export default function CoinDetails() {
           >
             <Text>Loading chart...</Text>
           </View>
+        ) : chartData.length === 0 ? (
+          <View
+            style={[
+              styles.chart,
+              { justifyContent: "center", alignItems: "center" },
+            ]}
+          >
+            <Text style={styles.apiLimitText}>
+              All API credits have been consumed. It will refresh at 12:00 AM
+            </Text>
+          </View>
         ) : (
           <LineGraph
             points={chartData}
@@ -203,8 +233,8 @@ export default function CoinDetails() {
             onPointSelected={(p) => updatePriceTitle(p)}
             onGestureEnd={() => resetPriceTitle()}
             SelectionDot={CustomSelectionDot}
-            TopAxisLabel={() => <AxisLabel x={max.x} value={max.value} />}
-            BottomAxisLabel={() => <AxisLabel x={min.x} value={min.value} />}
+            TopAxisLabel={chartData.length > 0 ? () => <AxisLabel x={max.x} value={max.value} /> : undefined}
+            BottomAxisLabel={chartData.length > 0 ? () => <AxisLabel x={min.x} value={min.value} /> : undefined}
             style={styles.chart}
           />
         )}
@@ -409,5 +439,17 @@ const styles = StyleSheet.create({
   transactionsText: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  apiLimitText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    paddingHorizontal: 20,
+  },
+  positiveChange: {
+    color: "#00C851",
+  },
+  negativeChange: {
+    color: "#FF0000",
   },
 });
