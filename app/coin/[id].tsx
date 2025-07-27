@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Dimensions,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
 } from "react-native";
 import { GraphPoint, LineGraph } from "react-native-graph";
 import { fetchCoinHistory } from "../../services/coinApi";
+import AxisLabel from "../components/AxisLabel";
 import CustomSelectionDot from "../components/CustomSelectionDot";
 
 const { width } = Dimensions.get("window");
@@ -20,8 +22,47 @@ const hapticFeedback = (type: "impactLight") => {
   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 };
 
+const getMinMaxValues = (data: GraphPoint[]) => {
+  if (data.length === 0)
+    return { min: { x: 0, value: 0 }, max: { x: 0, value: 0 } };
+
+  let minValue = data[0].value;
+  let maxValue = data[0].value;
+  let minIndex = 0;
+  let maxIndex = 0;
+
+  data.forEach((point, index) => {
+    if (point.value < minValue) {
+      minValue = point.value;
+      minIndex = index;
+    }
+    if (point.value > maxValue) {
+      maxValue = point.value;
+      maxIndex = index;
+    }
+  });
+
+  const chartWidth = width - 32;
+  return {
+    min: {
+      x: (minIndex / (data.length - 1)) * chartWidth,
+      value: minValue,
+    },
+    max: {
+      x: (maxIndex / (data.length - 1)) * chartWidth,
+      value: maxValue,
+    },
+  };
+};
+
 export default function CoinDetails() {
-  const { id, name, symbol, ticker } = useLocalSearchParams();
+  const { id, name, symbol, ticker, imageUrl } = useLocalSearchParams();
+
+  const coinImageUrl =
+    imageUrl?.toString() ||
+    `https://lcw.nyc3.cdn.digitaloceanspaces.com/production/currencies/32/${id
+      ?.toString()
+      .toLowerCase()}.png`;
   const [selectedPoint, setSelectedPoint] = useState<GraphPoint | null>(null);
   const [chartData, setChartData] = useState<GraphPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +134,8 @@ export default function CoinDetails() {
     setSelectedPoint(null);
   };
 
+  const { min, max } = getMinMaxValues(chartData);
+
   return (
     <ScrollView
       style={styles.container}
@@ -104,15 +147,23 @@ export default function CoinDetails() {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerTitle}>
-          <Text style={styles.coinSymbol}>{coinSymbol}</Text>
-          <Text style={styles.coinName}>{coinName} ({coinTicker})</Text>
-          <TouchableOpacity>
-            <Ionicons name="star-outline" size={24} color="#000" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Image
+              source={{ uri: coinImageUrl }}
+              style={styles.coinImage}
+              resizeMode="contain"
+            />
+            <Text style={styles.coinName}>
+              {coinName} ({coinTicker})
+            </Text>
+          </View>
+
+          <View>
+            <TouchableOpacity>
+              <Ionicons name="star-outline" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <TouchableOpacity style={styles.exchangeButton}>
-          <Text style={styles.exchangeText}>Exchange</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Price Section */}
@@ -152,6 +203,8 @@ export default function CoinDetails() {
             onPointSelected={(p) => updatePriceTitle(p)}
             onGestureEnd={() => resetPriceTitle()}
             SelectionDot={CustomSelectionDot}
+            TopAxisLabel={() => <AxisLabel x={max.x} value={max.value} />}
+            BottomAxisLabel={() => <AxisLabel x={min.x} value={min.value} />}
             style={styles.chart}
           />
         )}
@@ -180,25 +233,7 @@ export default function CoinDetails() {
         ))}
       </View>
 
-      {/* Holdings Section */}
-      <View style={styles.holdingsSection}>
-        <View style={styles.holdingsHeader}>
-          <View style={styles.coinInfo}>
-            <View style={styles.coinIcon}>
-              <Text style={styles.coinIconText}>{coinSymbol}</Text>
-            </View>
-            <View>
-              <Text style={styles.holdingsCoinName}>{coinName}</Text>
-              <Text style={styles.holdingsAmount}>0.00 {coinTicker}</Text>
-            </View>
-          </View>
-          <View style={styles.holdingsValue}>
-            <Text style={styles.holdingsPrice}>₹0.00</Text>
-            <Text style={styles.holdingsChange}>0.00%</Text>
-          </View>
-        </View>
-      </View>
-
+  
       {/* Transactions */}
       <TouchableOpacity style={styles.transactionsSection}>
         <Text style={styles.transactionsText}>Transactions</Text>
@@ -219,18 +254,21 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
   headerTitle: {
+    flex: 1,
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     gap: 8,
+    paddingHorizontal:10
   },
-  coinSymbol: {
-    fontSize: 24,
-    fontWeight: "bold",
+  coinImage: {
+    width: 24,
+    height: 24,
   },
   coinName: {
     fontSize: 18,
@@ -373,5 +411,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-
-
