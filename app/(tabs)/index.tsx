@@ -7,7 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+
 import { useCoinStore } from "../../store/coinStore";
 import CryptoCard from "../components/CryptoCard";
 
@@ -40,27 +40,27 @@ export default function Home() {
 
   if (loading) {
     return (
-      <SafeAreaView edges={["top"]} style={styles.container}>
+     
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading coins...</Text>
         </View>
-      </SafeAreaView>
+
     );
   }
 
   if (error && coins.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>Error: {error}</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
       <FlashList
@@ -73,7 +73,7 @@ export default function Home() {
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

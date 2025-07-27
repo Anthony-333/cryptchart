@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import MiniChart from "./MiniChart";
@@ -20,8 +21,12 @@ interface CryptoCardProps {
 export default function CryptoCard({ crypto }: CryptoCardProps) {
   const isPositive = crypto.change > 0;
 
+  const handlePress = () => {
+  router.push(`/coin/${crypto.id}`);
+};
+
   return (
-    <TouchableOpacity style={styles.container}>
+    <TouchableOpacity style={styles.container} onPress={handlePress}>
       <View style={styles.leftSection}>
         <View style={[styles.iconContainer, { backgroundColor: crypto.imageUrl ? 'transparent' : crypto.color }]}>
           {crypto.imageUrl ? (
@@ -125,4 +130,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 });
+
+
 

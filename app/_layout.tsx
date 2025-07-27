@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -7,10 +8,13 @@ import {
 export default function RootLayout() {
   const insets = useSafeAreaInsets();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <SafeAreaView style={{ paddingTop: insets.top }}>
-        <Stack.Screen name="(tabs)" />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView  style={{ flex: 1}}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+        </Stack>
       </SafeAreaView>
-    </Stack>
+    </GestureHandlerRootView>
   );
 }
+

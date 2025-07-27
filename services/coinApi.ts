@@ -32,3 +32,37 @@ export const fetchCoinsList = async (offset: number = 0, limit: number = 50): Pr
   }
 };
 
+export const fetchCoinHistory = async (
+  code: string,
+  start: number,
+  end: number
+): Promise<any[]> => {
+  try {
+    const response = await fetch(new Request(`${API_BASE_URL}/coins/single/history`), {
+      method: 'POST',
+      headers: new Headers({
+        'content-type': 'application/json',
+        'x-api-key': process.env.EXPO_PUBLIC_API_KEY || '',
+      }),
+      body: JSON.stringify({
+        currency: 'USD',
+        code,
+        start,
+        end,
+        meta: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.history || [];
+  } catch (error) {
+    console.error('Error fetching coin history:', error);
+    throw error;
+  }
+};
+
+
