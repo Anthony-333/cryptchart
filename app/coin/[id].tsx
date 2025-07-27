@@ -1,7 +1,7 @@
 import { useCoinStore } from "@/store/coinStore";
 import { useFavoritesStore } from "@/store/favoritesStore";
+import { usePortfolioStore } from "@/store/portfolioStore";
 import { Ionicons } from "@expo/vector-icons";
-import { FlashList } from "@shopify/flash-list";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
@@ -12,8 +12,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { GraphPoint, LineGraph } from "react-native-graph";
 import { fetchCoinHistory } from "../../services/coinApi";
@@ -71,6 +72,7 @@ export default function CoinDetails() {
   const { addToFavorites, removeFromFavorites, isFavorite, loadFavorites } =
     useFavoritesStore();
   const { coins } = useCoinStore();
+  const { buyCoin, sellCoin, holdings } = usePortfolioStore();
 
   const coinImageUrl =
     imageUrl?.toString() ||
@@ -81,6 +83,9 @@ export default function CoinDetails() {
   const [chartData, setChartData] = useState<GraphPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTimeframe, setSelectedTimeframe] = useState("24H");
+  const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
+  const [priceInput, setPriceInput] = useState('0');
+  const [amountInput, setAmountInput] = useState('0.1');
 
   const coinName = name?.toString() || "Bitcoin";
   const coinSymbol = symbol?.toString() || "₿";
@@ -178,6 +183,48 @@ export default function CoinDetails() {
   };
 
   const isCurrentlyFavorite = isFavorite(id?.toString() || "");
+
+  const handleBuy = async () => {
+    const coinId = id?.toString() || "";
+    const quantity = 0.1; // Default quantity, you can make this configurable
+    const success = await buyCoin(
+      coinId,
+      coinName,
+      coinTicker,
+      coinImageUrl,
+      quantity,
+      currentPrice
+    );
+
+    if (success) {
+      alert(`Successfully bought ${quantity} ${coinTicker}`);
+    } else {
+      alert("Insufficient funds");
+    }
+  };
+
+  const handleSell = async () => {
+    const coinId = id?.toString() || "";
+    const holding = holdings.find((h) => h.id === coinId);
+
+    if (!holding) {
+      alert("You don't own this coin");
+      return;
+    }
+
+    const quantity = Math.min(0.1, holding.quantity); // Sell 0.1 or all if less
+    const success = await sellCoin(coinId, quantity, currentPrice);
+
+    if (success) {
+      alert(`Successfully sold ${quantity} ${coinTicker}`);
+    } else {
+      alert("Insufficient holdings");
+    }
+  };
+
+  useEffect(() => {
+    setPriceInput(currentPrice.toString());
+  }, [currentPrice]);
 
   return (
     <ScrollView
@@ -315,52 +362,154 @@ export default function CoinDetails() {
         ))}
       </View>
 
-      {/* Related Coins */}
-      <View style={styles.relatedCoinsSection}>
-        <Text style={styles.sectionTitle}>Related Coins</Text>
-        <FlashList
-          data={coins.slice(0, 10)}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.relatedCoinItem}
-              onPress={() =>
-                router.push(
-                  `/coin/${item.id}?name=${encodeURIComponent(
-                    item.name
-                  )}&ticker=${encodeURIComponent(
-                    item.ticker
-                  )}&imageUrl=${encodeURIComponent(item.imageUrl || "")}`
-                )
-              }
-            >
-              <View style={styles.coinInfo}>
-                <Image
-                  source={{ uri: item.imageUrl }}
-                  style={styles.relatedCoinImage}
-                />
-                <View>
-                  <Text style={styles.relatedCoinName}>{item.name}</Text>
-                  <Text style={styles.relatedCoinTicker}>{item.ticker}</Text>
-                </View>
-              </View>
-              <View style={styles.relatedCoinPrice}>
-                <Text style={styles.priceText}>${item.price.toFixed(2)}</Text>
-                <Text
-                  style={[
-                    styles.changeText,
-                    { color: item.change >= 0 ? "#00C851" : "#FF3B30" },
-                  ]}
-                >
-                  {item.change >= 0 ? "+" : ""}
-                  {item.change.toFixed(2)}%
-                </Text>
-              </View>
+      {/* Trading Interface */}
+      <View style={styles.tradingInterface}>
+        {/* Buy/Sell Toggle */}
+        <View style={styles.toggleContainer}>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              styles.toggleLeft,
+              orderType === 'buy' && styles.toggleActive,
+            ]}
+            onPress={() => setOrderType('buy')}
+          >
+            <Text style={[
+              styles.toggleText,
+              orderType === 'buy' && styles.toggleActiveText,
+            ]}>
+              Buy
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.toggleButton,
+              styles.toggleRight,
+              orderType === 'sell' && styles.toggleActiveSell,
+            ]}
+            onPress={() => setOrderType('sell')}
+          >
+            <Text style={[
+              styles.toggleText,
+              orderType === 'sell' && styles.toggleActiveText,
+            ]}>
+              Sell
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Price Input */}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputHeader}>
+            <Text style={styles.inputLabel}>Price (USDT)</Text>
+          </View>
+          <View style={styles.inputRow}>
+            <TouchableOpacity style={styles.adjustButton}>
+              <Text style={styles.adjustButtonText}>-</Text>
             </TouchableOpacity>
-          )}
-          estimatedItemSize={60}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={true}
-        />
+            <TextInput
+              style={styles.priceInput}
+              value={priceInput}
+              onChangeText={setPriceInput}
+              keyboardType="numeric"
+              placeholder="0.0000"
+            />
+            <TouchableOpacity style={styles.adjustButton}>
+              <Text style={styles.adjustButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Amount Input */}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputHeader}>
+            <Text style={styles.inputLabel}>Amount ({coinTicker})</Text>
+          </View>
+          <View style={styles.inputRow}>
+            <TouchableOpacity style={styles.adjustButton}>
+              <Text style={styles.adjustButtonText}>-</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={styles.amountInput}
+              value={amountInput}
+              onChangeText={setAmountInput}
+              keyboardType="numeric"
+              placeholder="0.0000"
+            />
+            <TouchableOpacity style={styles.adjustButton}>
+              <Text style={styles.adjustButtonText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Percentage Slider */}
+        <View style={styles.sliderContainer}>
+          <View style={styles.sliderTrack}>
+            <View style={styles.sliderFill} />
+            <View style={styles.sliderThumb} />
+          </View>
+          <View style={styles.percentageLabels}>
+            <Text style={styles.percentageText}>0%</Text>
+            <Text style={styles.percentageText}>25%</Text>
+            <Text style={styles.percentageText}>50%</Text>
+            <Text style={styles.percentageText}>75%</Text>
+            <Text style={styles.percentageText}>100%</Text>
+          </View>
+        </View>
+
+        {/* Total */}
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalLabel}>Total (USDT)</Text>
+          <Text style={styles.totalValue}>
+            {(parseFloat(priceInput || '0') * parseFloat(amountInput || '0')).toFixed(4)}
+          </Text>
+        </View>
+
+        {/* Options */}
+        <View style={styles.optionsContainer}>
+          <View style={styles.optionRow}>
+            <View style={styles.checkbox} />
+            <Text style={styles.optionText}>TP/SL</Text>
+          </View>
+          <View style={styles.optionRow}>
+            <View style={styles.checkbox} />
+            <Text style={styles.optionText}>Iceberg</Text>
+          </View>
+        </View>
+
+        {/* Available Balance */}
+        <View style={styles.balanceInfo}>
+          <View style={styles.balanceRow}>
+            <Text style={styles.balanceLabel}>Avbl</Text>
+            <Text style={styles.balanceValue}>0.03179004 USDT</Text>
+            <View style={styles.addButton}>
+              <Text style={styles.addButtonText}>+</Text>
+            </View>
+          </View>
+          <View style={styles.balanceRow}>
+            <Text style={styles.balanceLabel}>Max {orderType === 'buy' ? 'Buy' : 'Sell'}</Text>
+            <Text style={styles.balanceValue}>0.18 {coinTicker}</Text>
+          </View>
+          <View style={styles.balanceRow}>
+            <Text style={styles.balanceLabel}>Est. Fee</Text>
+            <Text style={styles.balanceValue}>-- {coinTicker}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Trading Section */}
+      <View style={styles.tradingSection}>
+        <TouchableOpacity 
+          style={[
+            styles.tradeButton,
+            orderType === 'buy' ? styles.buyButton : styles.sellButton
+          ]} 
+          onPress={orderType === 'buy' ? handleBuy : handleSell}
+        >
+          <Text style={styles.tradeButtonText}>
+            {orderType === 'buy' ? 'Buy' : 'Sell'} {coinTicker}
+          </Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -439,7 +588,7 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   chart: {
     height: 250,
@@ -449,7 +598,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 10,
     backgroundColor: "#f8f9fa",
     marginHorizontal: 16,
     borderRadius: 12,
@@ -545,45 +694,249 @@ const styles = StyleSheet.create({
   negativeChange: {
     color: "#FF0000",
   },
-  relatedCoinsSection: {
+  tradingSection: {
+    flexDirection: "row",
+    gap: 12,
     margin: 16,
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
+  buyButton: {
+    flex: 1,
+    backgroundColor: "#00C851",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
   },
-  relatedCoinItem: {
+  buyButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  sellButton: {
+    flex: 1,
+    backgroundColor: "#FF3B30",
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  sellButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  tradingInterface: {
+    backgroundColor: "#f8f9fa",
+    margin: 16,
+    borderRadius: 12,
+    padding: 16,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+  },
+  toggleLeft: {
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
+  },
+  toggleRight: {
+    borderTopRightRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  toggleActive: {
+    backgroundColor: "#00C851",
+  },
+  toggleActiveSell: {
+    backgroundColor: "#FF3B30",
+  },
+  toggleText: {
+    color: "#333",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  toggleActiveText: {
+    color: "#fff",
+  },
+  orderTypeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  orderTypeLeft: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: "#f8f9fa",
-    borderRadius: 12,
+    gap: 8,
+  },
+  orderTypeText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputHeader: {
     marginBottom: 8,
   },
-  relatedCoinImage: {
-    width: 32,
-    height: 32,
-  },
-  relatedCoinName: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  relatedCoinTicker: {
-    fontSize: 12,
+  inputLabel: {
     color: "#666",
-  },
-  relatedCoinPrice: {
-    alignItems: "flex-end",
-  },
-  priceText: {
     fontSize: 14,
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+  },
+  adjustButton: {
+    padding: 8,
+  },
+  adjustButtonText: {
+    color: "#333",
+    fontSize: 18,
     fontWeight: "600",
   },
-  changeText: {
+  priceInput: {
+    flex: 1,
+    color: "#333",
+    fontSize: 18,
+    fontWeight: "600",
+    textAlign: "center",
+    paddingVertical: 12,
+  },
+  amountInput: {
+    flex: 1,
+    color: "#333",
+    fontSize: 16,
+    textAlign: "center",
+    paddingVertical: 12,
+  },
+  sliderContainer: {
+    marginBottom: 20,
+  },
+  sliderTrack: {
+    height: 4,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 2,
+    position: "relative",
+    marginBottom: 8,
+  },
+  sliderFill: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    height: 4,
+    width: "25%",
+    backgroundColor: "#00C851",
+    borderRadius: 2,
+  },
+  sliderThumb: {
+    position: "absolute",
+    left: "25%",
+    top: -4,
+    width: 12,
+    height: 12,
+    backgroundColor: "#00C851",
+    borderRadius: 6,
+    transform: [{ translateX: -6 }],
+  },
+  percentageLabels: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  percentageText: {
+    color: "#666",
     fontSize: 12,
+  },
+  totalContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e0e0e0",
+    marginBottom: 20,
+  },
+  totalLabel: {
+    color: "#666",
+    fontSize: 16,
+  },
+  totalValue: {
+    color: "#333",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  optionsContainer: {
+    marginBottom: 20,
+  },
+  optionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  checkbox: {
+    width: 16,
+    height: 16,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 2,
+  },
+  optionText: {
+    color: "#333",
+    fontSize: 14,
+  },
+  balanceInfo: {
+    marginBottom: 20,
+  },
+  balanceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  balanceLabel: {
+    color: "#666",
+    fontSize: 14,
+    flex: 1,
+  },
+  balanceValue: {
+    color: "#333",
+    fontSize: 14,
+    flex: 2,
+    textAlign: "right",
+  },
+  addButton: {
+    width: 20,
+    height: 20,
+    backgroundColor: "#FFD700",
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  addButtonText: {
+    color: "#000",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  tradeButton: {
+    flex: 1,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  tradeButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
