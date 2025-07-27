@@ -22,8 +22,8 @@ export default function CryptoCard({ crypto }: CryptoCardProps) {
   const isPositive = crypto.change > 0;
 
   const handlePress = () => {
-  router.push(`/coin/${crypto.id}`);
-};
+    router.push(`/coin/${crypto.id}?name=${encodeURIComponent(crypto.name)}&symbol=${encodeURIComponent(crypto.icon)}&ticker=${encodeURIComponent(crypto.ticker)}`);
+  };
 
   return (
     <TouchableOpacity style={styles.container} onPress={handlePress}>
@@ -130,6 +130,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 });
+
 
 
 
