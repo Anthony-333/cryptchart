@@ -12,7 +12,15 @@ import { useCoinStore } from "../../store/coinStore";
 import CryptoCard from "../components/CryptoCard";
 
 export default function Home() {
-  const { coins, loading, loadingMore, error, hasMore, fetchCoins, fetchMoreCoins } = useCoinStore();
+  const {
+    coins,
+    loading,
+    loadingMore,
+    error,
+    hasMore,
+    fetchCoins,
+    fetchMoreCoins,
+  } = useCoinStore();
 
   useEffect(() => {
     fetchCoins();
@@ -40,12 +48,10 @@ export default function Home() {
 
   if (loading) {
     return (
-     
-        <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading coins...</Text>
-        </View>
-
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading coins...</Text>
+      </View>
     );
   }
 
@@ -63,15 +69,21 @@ export default function Home() {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
 
+      <View>
+        <Text style={{fontSize: 24, fontWeight: "bold", paddingHorizontal: 16, paddingVertical: 5}}>Home</Text>
+      </View>
+
       <FlashList
         data={coins}
         renderItem={renderItem}
-        estimatedItemSize={80}
+        estimatedItemSize={50}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContainer}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
+        onRefresh={fetchCoins}
+        refreshing={loading}
       />
     </View>
   );
@@ -113,5 +125,4 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 });
-
 

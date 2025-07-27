@@ -1,10 +1,14 @@
+import { useCoinStore } from "@/store/coinStore";
+import { useFavoritesStore } from "@/store/favoritesStore";
 import { Ionicons } from "@expo/vector-icons";
+import { FlashList } from "@shopify/flash-list";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   Image,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -29,7 +33,7 @@ const getMinMaxValues = (data: GraphPoint[]) => {
   if (data.length === 1) {
     return {
       min: { x: 0, value: data[0].value },
-      max: { x: width - 32, value: data[0].value }
+      max: { x: width - 32, value: data[0].value },
     };
   }
 
@@ -64,6 +68,9 @@ const getMinMaxValues = (data: GraphPoint[]) => {
 
 export default function CoinDetails() {
   const { id, name, symbol, ticker, imageUrl } = useLocalSearchParams();
+  const { addToFavorites, removeFromFavorites, isFavorite, loadFavorites } =
+    useFavoritesStore();
+  const { coins } = useCoinStore();
 
   const coinImageUrl =
     imageUrl?.toString() ||
@@ -83,6 +90,7 @@ export default function CoinDetails() {
 
   useEffect(() => {
     loadChartData();
+    loadFavorites();
   }, [id, selectedTimeframe]);
 
   const getTimeRange = () => {
@@ -124,21 +132,23 @@ export default function CoinDetails() {
   // Add this function to calculate price change
   const getPriceChange = () => {
     if (chartData.length < 2) return { amount: 0, percentage: 0 };
-    
+
     const currentPrice = chartData[chartData.length - 1]?.value || 0;
     const previousPrice = chartData[0]?.value || 0;
-    
+
     const changeAmount = currentPrice - previousPrice;
-    const changePercentage = previousPrice !== 0 ? (changeAmount / previousPrice) * 100 : 0;
-    
+    const changePercentage =
+      previousPrice !== 0 ? (changeAmount / previousPrice) * 100 : 0;
+
     return { amount: changeAmount, percentage: changePercentage };
   };
 
   const currentPrice = selectedPoint
     ? selectedPoint.value
-    : chartData[chartData.length - 1]?.value || 98509.75;
+    : chartData[chartData.length - 1]?.value || 0;
   const currentDate = selectedPoint ? selectedPoint.date : new Date();
-  const { amount: changeAmount, percentage: changePercentage } = getPriceChange();
+  const { amount: changeAmount, percentage: changePercentage } =
+    getPriceChange();
   const isPositive = changeAmount >= 0;
 
   const updatePriceTitle = (point: GraphPoint) => {
@@ -151,10 +161,35 @@ export default function CoinDetails() {
 
   const { min, max } = getMinMaxValues(chartData);
 
+  const handleFavoriteToggle = async () => {
+    const coinId = id?.toString() || "";
+    const favoriteItem = {
+      id: coinId,
+      name: coinName,
+      ticker: coinTicker,
+      imageUrl: coinImageUrl,
+    };
+
+    if (isFavorite(coinId)) {
+      await removeFromFavorites(coinId);
+    } else {
+      await addToFavorites(favoriteItem);
+    }
+  };
+
+  const isCurrentlyFavorite = isFavorite(id?.toString() || "");
+
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={loadChartData}
+          tintColor="#007AFF"
+        />
+      }
     >
       {/* Header */}
       <View style={styles.header}>
@@ -174,8 +209,12 @@ export default function CoinDetails() {
           </View>
 
           <View>
-            <TouchableOpacity>
-              <Ionicons name="star-outline" size={24} color="#000" />
+            <TouchableOpacity onPress={handleFavoriteToggle}>
+              <Ionicons
+                name={isCurrentlyFavorite ? "star" : "star-outline"}
+                size={24}
+                color={isCurrentlyFavorite ? "#FFD700" : "#000"}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -187,12 +226,17 @@ export default function CoinDetails() {
           ${currentPrice.toLocaleString()}
         </Text>
         <View style={styles.priceChange}>
-          <Text style={[styles.changeAmount, { color: isPositive ? "#00C851" : "#FF3B30" }]}>
-            {isPositive ? "+" : ""}{changeAmount.toFixed(2)} ({isPositive ? "+" : ""}{changePercentage.toFixed(2)}%)
+          <Text
+            style={[
+              styles.changeAmount,
+              { color: isPositive ? "#00C851" : "#FF3B30" },
+            ]}
+          >
+            {isPositive ? "+" : ""}
+            {changeAmount.toFixed(2)} ({isPositive ? "+" : ""}
+            {changePercentage.toFixed(2)}%)
           </Text>
-          <Text style={styles.usdPrice}>
-            {selectedTimeframe}
-          </Text>
+          <Text style={styles.usdPrice}>{selectedTimeframe}</Text>
         </View>
         {selectedPoint && (
           <Text style={styles.selectedDate}>
@@ -233,8 +277,16 @@ export default function CoinDetails() {
             onPointSelected={(p) => updatePriceTitle(p)}
             onGestureEnd={() => resetPriceTitle()}
             SelectionDot={CustomSelectionDot}
-            TopAxisLabel={chartData.length > 0 ? () => <AxisLabel x={max.x} value={max.value} /> : undefined}
-            BottomAxisLabel={chartData.length > 0 ? () => <AxisLabel x={min.x} value={min.value} /> : undefined}
+            TopAxisLabel={
+              chartData.length > 0
+                ? () => <AxisLabel x={max.x} value={max.value} />
+                : undefined
+            }
+            BottomAxisLabel={
+              chartData.length > 0
+                ? () => <AxisLabel x={min.x} value={min.value} />
+                : undefined
+            }
             style={styles.chart}
           />
         )}
@@ -263,12 +315,53 @@ export default function CoinDetails() {
         ))}
       </View>
 
-  
-      {/* Transactions */}
-      <TouchableOpacity style={styles.transactionsSection}>
-        <Text style={styles.transactionsText}>Transactions</Text>
-        <Ionicons name="chevron-forward" size={20} color="#666" />
-      </TouchableOpacity>
+      {/* Related Coins */}
+      <View style={styles.relatedCoinsSection}>
+        <Text style={styles.sectionTitle}>Related Coins</Text>
+        <FlashList
+          data={coins.slice(0, 10)}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.relatedCoinItem}
+              onPress={() =>
+                router.push(
+                  `/coin/${item.id}?name=${encodeURIComponent(
+                    item.name
+                  )}&ticker=${encodeURIComponent(
+                    item.ticker
+                  )}&imageUrl=${encodeURIComponent(item.imageUrl || "")}`
+                )
+              }
+            >
+              <View style={styles.coinInfo}>
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.relatedCoinImage}
+                />
+                <View>
+                  <Text style={styles.relatedCoinName}>{item.name}</Text>
+                  <Text style={styles.relatedCoinTicker}>{item.ticker}</Text>
+                </View>
+              </View>
+              <View style={styles.relatedCoinPrice}>
+                <Text style={styles.priceText}>${item.price.toFixed(2)}</Text>
+                <Text
+                  style={[
+                    styles.changeText,
+                    { color: item.change >= 0 ? "#00C851" : "#FF3B30" },
+                  ]}
+                >
+                  {item.change >= 0 ? "+" : ""}
+                  {item.change.toFixed(2)}%
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          estimatedItemSize={60}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+        />
+      </View>
     </ScrollView>
   );
 }
@@ -294,7 +387,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     gap: 8,
-    paddingHorizontal:10
+    paddingHorizontal: 10,
   },
   coinImage: {
     width: 24,
@@ -451,5 +544,46 @@ const styles = StyleSheet.create({
   },
   negativeChange: {
     color: "#FF0000",
+  },
+  relatedCoinsSection: {
+    margin: 16,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  relatedCoinItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  relatedCoinImage: {
+    width: 32,
+    height: 32,
+  },
+  relatedCoinName: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  relatedCoinTicker: {
+    fontSize: 12,
+    color: "#666",
+  },
+  relatedCoinPrice: {
+    alignItems: "flex-end",
+  },
+  priceText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  changeText: {
+    fontSize: 12,
   },
 });

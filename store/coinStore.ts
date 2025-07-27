@@ -22,7 +22,7 @@ const transformCoinData = (coin: CoinData): TransformedCoin => ({
   name: coin.name || 'Unknown',
   ticker: cleanCoinName(coin.code || 'N/A'),
   price: coin.rate || 0,
-  marketCap: coin.cap ? `$${(coin.cap / 1e9).toFixed(1)}B` : 'N/A',
+  marketCap: coin.cap || 0, // Keep as number instead of formatting here
   change: coin.delta?.day ? ((coin.delta.day - 1) * 100) : 0,
   icon: coin.symbol || (coin.code ? coin.code.charAt(0) : '?'),
   imageUrl: coin.png32,
@@ -79,6 +79,7 @@ export const useCoinStore = create<CoinStore>((set, get) => ({
     }
   },
 }));
+
 
 
 

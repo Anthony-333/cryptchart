@@ -27,10 +27,11 @@ export interface TransformedCoin {
   name: string;
   ticker: string;
   price: number;
-  marketCap: string;
+  marketCap: number;
   change: number;
   icon: string;
   imageUrl?: string;
   color: string;
   chartData: number[];
 }
+
